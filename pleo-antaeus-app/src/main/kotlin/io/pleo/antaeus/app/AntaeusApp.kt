@@ -8,13 +8,17 @@
 package io.pleo.antaeus.app
 
 import getPaymentProvider
+import io.pleo.antaeus.core.external.LoggerNotificationService
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
 import io.pleo.antaeus.core.services.InvoiceService
+import io.pleo.antaeus.core.services.InvoiceValidatorService
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.data.CustomerTable
 import io.pleo.antaeus.data.InvoiceTable
 import io.pleo.antaeus.rest.AntaeusRest
+import io.pleo.antaeus.rest.handlers.InvoicesHandler
+import io.pleo.antaeus.scheduler.startScheduler
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.StdOutSqlLogger
@@ -32,10 +36,12 @@ fun main() {
     val dbFile: File = File.createTempFile("antaeus-db", ".sqlite")
     // Connect to the database and create the needed tables. Drop any existing data.
     val db = Database
-        .connect(url = "jdbc:sqlite:${dbFile.absolutePath}",
+        .connect(
+            url = "jdbc:sqlite:${dbFile.absolutePath}",
             driver = "org.sqlite.JDBC",
             user = "root",
-            password = "")
+            password = ""
+        )
         .also {
             TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
             transaction(it) {
@@ -59,13 +65,28 @@ fun main() {
     // Create core services
     val invoiceService = InvoiceService(dal = dal)
     val customerService = CustomerService(dal = dal)
-
+    val notificationService = LoggerNotificationService()
+    val invoiceValidatorService = InvoiceValidatorService(
+        invoiceService = invoiceService,
+        customerService = customerService,
+        notificationService = notificationService
+    )
     // This is _your_ billing service to be included where you see fit
-    val billingService = BillingService(paymentProvider = paymentProvider)
+    val billingService = BillingService(
+        paymentProvider = paymentProvider,
+        invoiceService = invoiceService,
+        notificationService = notificationService,
+        invoiceValidatorService = invoiceValidatorService
+    )
+
+    val invoicesHandler = InvoicesHandler(billingService)
+
+    startScheduler(billingService, notificationService)
 
     // Create REST web service
     AntaeusRest(
         invoiceService = invoiceService,
-        customerService = customerService
+        customerService = customerService,
+        invoicesHandler = invoicesHandler
     ).run()
 }
