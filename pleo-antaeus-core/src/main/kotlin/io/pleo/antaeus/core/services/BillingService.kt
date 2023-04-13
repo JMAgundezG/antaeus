@@ -6,7 +6,7 @@ import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import mu.KotlinLogging
 import java.lang.Exception
-
+import java.util.concurrent.Semaphore
 
 
 class BillingService(
@@ -16,12 +16,12 @@ class BillingService(
     private val notificationService: NotificationService
 ) {
     val logger = KotlinLogging.logger("BillingService")
-
+    val semaphore = Semaphore(1)
     private fun chargeInvoice(invoice: Invoice): Boolean {
         logger.info("charging invoice ${invoice.id}")
         val validatedInvoice = invoiceValidatorService.validateAndUpdate(invoice)
         var result: Boolean
-        if (isInvoicePayable(validatedInvoice)) {
+        if (invoiceValidatorService.isInvoicePayable(validatedInvoice)) {
             try {
                 result = paymentProvider.charge(validatedInvoice)
             } catch (e: Exception) {
@@ -48,14 +48,13 @@ class BillingService(
 
     fun chargeAllInvoices() {
         logger.info("Starting charging all invoices process")
-
+        semaphore.acquire()
         invoiceService.fetchAllExcludingStatus(InvoiceStatus.PAID).parallelStream().map {
             chargeInvoice(it)
         }.toArray()
+        semaphore.release()
     }
 
-    private fun isInvoicePayable(invoice: Invoice): Boolean {
-        return invoice.status == InvoiceStatus.READY
-    }
+
 
 }

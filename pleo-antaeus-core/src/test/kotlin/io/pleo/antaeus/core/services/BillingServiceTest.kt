@@ -56,5 +56,4 @@ class BillingServiceTest {
     fun `payInvoice will return false paymentProvider fails`() {
         assert(!billingService.chargeInvoice(404))
     }
-
 }

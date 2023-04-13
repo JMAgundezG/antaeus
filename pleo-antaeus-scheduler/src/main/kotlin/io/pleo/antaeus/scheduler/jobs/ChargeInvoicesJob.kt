@@ -2,16 +2,18 @@ package io.pleo.antaeus.scheduler.jobs
 
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.scheduler.utils.OncePerDayAt9AM
+import mu.KotlinLogging
 import org.quartz.*
 import java.lang.Exception
 
 
 // https://www.baeldung.com/quartz
-val logger
+val logger = KotlinLogging.logger("ChargeInvoicesJob")
 
 class ChargeInvoicesJob() : PleoJob {
 
     override fun execute(context: JobExecutionContext?) {
+        logger.info("EXECUTION STARTED")
         var schedulerContext: SchedulerContext? = null
         try {
             if (context != null) {

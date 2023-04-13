@@ -42,4 +42,8 @@ class InvoiceValidatorService(
         }
         return InvoiceStatus.READY
     }
+
+    fun isInvoicePayable(invoice: Invoice): Boolean {
+        return invoice.status == InvoiceStatus.READY
+    }
 }
